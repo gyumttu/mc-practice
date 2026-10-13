@@ -39,6 +39,10 @@ button[hidden]{display:none}
 <label>영어 속도<select id="rate"><option value="0.8">천천히</option><option value="0.95" selected>보통</option><option value="1.05">빠르게</option></select></label>
 <label>외우기 단계<select id="lvl"><option value="1">1단계 · 보고 읽기</option><option value="2">2단계 · 첫 글자 힌트</option><option value="3">3단계 · 완전히 외우기</option></select></label>
 <label>음량 측정(큰 소리 판단)<select id="mt"><option value="1">켜기</option><option value="0">끄기 (아이패드·아이폰 기본)</option></select></label>
+<label>MC2(Claude) 영어 목소리<select id="vE"></select></label>
+<label>시범·관객 영어 목소리<select id="vE2"></select></label>
+<label>한국어 목소리<select id="vK"></select></label>
+<p class="note">목소리를 고르면 바로 들려 줘요. 기기에 내려받은 Premium·Enhanced 목소리가 가장 자연스러워요.</p>
 </details>
 <nav class="tabs"><button id="t1" class="on">📜 대본 연습</button><button id="t2">👥 관객 질문</button></nav>
 <div class="card">
@@ -65,13 +69,13 @@ button[hidden]{display:none}
 <script>
 const $=s=>document.querySelector(s);
 const L=[
-{w:'MC1',t:'Good evening! My name is {n1}.',tip:'웃으면서 활기차게 시작! 이름은 또박또박, 이름에 힘을 주세요.'},
+{w:'MC1',t:'Good evening! My name is {n1}.',tip:'편안한 미소로 시작해 봐요. 이름은 또박또박!'},
 {w:'MC2',t:'My name is {n2}. We want to share what a wonderful year we had here at Harvard.'},
 {w:'MC1',t:'This year was amazing! We did so many wonderful things together. Golf, soccer, swimming, jumprope, Korean drums, and violin.',tip:'나열할 땐 단어마다 살짝 올리고(↗) 마지막 violin에서 내려요(↘).'},
 {w:'MC2',t:'From spring to summer, fall and winter, we had so much fun throughout the year. Global experience day with Tony and Mari teachers. English recital days. Interview with Zoe. Market day and Halloween. What a splendid year we had!'},
 {w:'MC1',t:'We smiled, we laughed and we made so many wonderful memories together.',tip:'smiled, laughed, memories를 따뜻하게. 마지막 together에서 내려요.'},
 {w:'MC2',t:"And now, the fun isn't over yet! Let's keep the fun going!"},
-{w:'MC1',both:1,t:'Enjoy the rest of the show! Thank you!',tip:'MC2와 함께 한 호흡으로! Thank you가 가장 크게, 웃으며 인사.'}];
+{w:'MC1',both:1,t:'Enjoy the rest of the show! Thank you!',tip:'MC2와 함께 말해요. 마지막 Thank you는 웃으며 인사해요.'}];
 const QA=[
 {q:'What was your favorite thing this year?',a:'My favorite thing was Halloween. I dressed up and had so much fun with my friends.'},
 {q:'Which activity did you like the most, golf, soccer, swimming, or violin?',a:'I liked soccer the most because I played with my friends.'},
@@ -90,14 +94,19 @@ const nm=()=>$('#n1').value.trim()||'Hunter';
 const lvl=()=>+$('#lvl').value;
 const txt=i=>L[i].t.replace('{n1}',nm()).replace('{n2}',$('#n2').value.trim()||'Emily');
 // ---- 음성 출력
-let V=[];const loadV=()=>{V=speechSynthesis.getVoices()};loadV();speechSynthesis.onvoiceschanged=loadV;
-function pick(k){const e=V.filter(v=>/^en/i.test(v.lang)),us=e.filter(v=>/en[-_]US/i.test(v.lang));
-const re=k==='mc2'?/Samantha|Google US English|Aria|Jenny|Zira|Ava|Allison/i:/Daniel|Google UK English Male|Alex|Guy|David|Mark|Fred|Aaron/i;
-return e.find(v=>re.test(v.name))||us[k==='mc2'?0:Math.min(1,us.length-1)]||e[0]||null}
-function say(t,l,k){return new Promise(r=>{const u=new SpeechSynthesisUtterance(t);
-if(l==='ko'){u.lang='ko-KR';const v=V.find(v=>/^ko/i.test(v.lang));if(v)u.voice=v;u.pitch=1.1}
-else{u.lang='en-US';const v=pick(k);if(v)u.voice=v;u.rate=+$('#rate').value;u.pitch=k==='mc2'?1.05:k==='aud'?.85:1}
-u.onend=u.onerror=()=>r();speechSynthesis.speak(u)})}
+let V=[];const Q=v=>(/Premium|Enhanced|Natural|Neural|Online|Siri/i.test(v.name)?10:0)+(/Samantha|Ava|Allison|Zoe|Jenny|Aria|Google US English|Daniel|Alex|Yuna|Google 한국의|Sora/i.test(v.name)?3:0)+(v.localService?0:1);
+function fillV(){const f=(id,re)=>{const el=$('#'+id);if(!el)return;const old=el.value;const list=V.filter(v=>re.test(v.lang)).sort((a,b)=>Q(b)-Q(a));el.innerHTML='<option value="">자동 (가장 자연스러운 목소리)</option>'+list.map(v=>`<option value="${v.name}">${v.name} (${v.lang})</option>`).join('');if(old)el.value=old};f('vE',/^en/i);f('vE2',/^en/i);f('vK',/^ko/i)}
+const loadV=()=>{V=speechSynthesis.getVoices();fillV()};
+loadV();speechSynthesis.onvoiceschanged=loadV;
+function pick(k,lang){const sel=lang==='ko'?'vK':k==='mc2'?'vE':'vE2';const want=$('#'+sel).value;const e=V.filter(v=>(lang==='ko'?/^ko/i:/^en/i).test(v.lang));
+if(want){const m=e.find(v=>v.name===want);if(m)return m}
+const us=e.filter(v=>lang==='ko'||/en[-_]US/i.test(v.lang)).sort((a,b)=>Q(b)-Q(a));
+if(k==='mc2'||lang==='ko')return us[0]||e[0]||null;
+const f=us.find(v=>/Daniel|Alex|Guy|David|Mark|Fred|Aaron|Male/i.test(v.name));return f||us[1]||us[0]||null}
+function say(t,l,k){const tk=S.tok;const parts=l==='ko'?[t]:(t.match(/[^.!?]+[.!?]*/g)||[t]).map(s=>s.trim()).filter(Boolean);
+return parts.reduce((p,s)=>p.then(()=>tk!==S.tok?null:new Promise(r=>{const u=new SpeechSynthesisUtterance(s);const v=pick(k,l);if(v)u.voice=v;
+if(l==='ko'){u.lang='ko-KR';u.rate=.95}else{u.lang='en-US';u.rate=+$('#rate').value}
+u.onend=u.onerror=()=>r();speechSynthesis.speak(u)})),Promise.resolve())}
 async function sp(parts){const tk=S.tok;for(const p of parts){if(tk!==S.tok)return false;await say(p.t,p.l,p.k)}return tk===S.tok}
 function stopAll(){S.tok++;speechSynthesis.cancel();if(S.stop)S.stop()}
 // ---- 화면
@@ -112,12 +121,12 @@ t.textContent=h?hintTxt(txt(i)):txt(i);tp.textContent=h&&x.tip?'💡 '+x.tip:''}
 else{w.style.background='var(--mc2)';w.textContent='👥 관객 질문';
 if(!S.q.length)t.textContent='대본을 다 외웠다면, 관객이 물어볼 만한 질문에 영어로 대답해 봐요!';
 else if(S.qi>=S.q.length){t.textContent='🎉 모든 질문 끝! 대단해요.'}
-else{t.textContent=S.q[S.qi].q;tp.textContent='💡 정답은 없어요. 내 경험을 because(왜냐하면)를 넣어 한 문장 이상으로!'}}}
-function ready(){status('🎤 '+nm()+(S.m==='r'?' 차례! 크게, 자신 있게!':', 대답해 볼까요?'));
+else{t.textContent=S.q[S.qi].q;tp.textContent='💡 정답은 없어요. 편하게 짧게 말해도 괜찮아요.'}}}
+function ready(){status('🎤 '+nm()+(S.m==='r'?' 차례예요. 준비되면 편하게 말해 봐요.':', 대답해 볼까요?'));
 S.m==='r'?setB('bModel','bRec',...(lvl()===3?['bHint']:[])):setB('bModel','bRec','bAsk')}
 // ---- 대본 연습 흐름
 async function startR(){stopAll();S.m='r';S.i=0;render();setB();
-if(await sp([{t:`${nm()}, 안녕! 지금부터 MC 연습을 시작할게. 목소리는 크게, 얼굴은 웃으면서, 자신 있게! 틀려도 괜찮아. 나는 MC2를 맡을게.`,l:'ko'}]))go(0)}
+if(await sp([{t:`${nm()}, 안녕! 지금부터 MC 연습을 시작할게. 천천히, 편하게 해도 돼. 틀려도 괜찮고, 몇 번이든 다시 할 수 있어. 나는 MC2를 맡을게.`,l:'ko'}]))go(0)}
 async function go(i){stopAll();S.i=i;S.hint=false;render();$('#bNext').textContent='➡ 다음으로';
 if(i>=L.length)return finish();
 if(L[i].w==='MC2'){setB();status('🎧 MC2 (Claude)가 말하는 중…');if(await sp([{t:txt(i),k:'mc2'}]))go(i+1);return}
@@ -143,30 +152,30 @@ function lcs(a,b){const m=a.length,n=b.length,d=Array.from({length:m+1},()=>Arra
 for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]+1:Math.max(d[i-1][j],d[i][j-1]);
 const h=new Set();let i=m,j=n;while(i&&j){if(a[i-1]===b[j-1]){h.add(i-1);i--;j--}else if(d[i-1][j]>=d[i][j-1])i--;else j--}return h}
 const vol=r=>(!r.hasMic||!r.voiced)?null:r.avg<.03?'low':r.avg<.06?'mid':'good';
-const CLOSE=()=>{const n=nm();return[`${n}, 잘하고 있어요! 넌 할 수 있어!`,`${n}, 자신감 있게! 다음엔 더 멋질 거예요!`,`${n}, 조금씩 좋아지고 있어요. 끝까지 파이팅!`][Math.random()*3|0]};
+const CLOSE=()=>{const n=nm();return[`${n}, 잘하고 있어요! 천천히 해도 괜찮아요!`,`${n}, 연습할수록 점점 편해져요. 오늘도 멋졌어요!`,`${n}, 한 번 해 본 것만으로도 큰 걸음이에요.`][Math.random()*3|0]};
 function fbR(res){const exp=norm(txt(S.i)),P=[],F=[],parts=[];let sc=null,miss=[];
 if(res.tx){const h=lcs(exp,norm(res.tx));sc=h.size/exp.length;miss=[...new Set(exp.filter((w,k)=>!h.has(k)&&w.length>3))].slice(0,3)}
 const v=vol(res);
-if(!res.hasMic)F.push('목소리는 더 크게! 맨 뒤 관객에게 들려준다고 생각해 봐요.');
-P.push(sc===null?'끝까지 용기 있게 말해 줬어요!':sc>=.9?'거의 완벽하게 외웠어요!':sc>=.7?'대본을 잘 기억하고 있어요!':'용기 내서 끝까지 말한 게 정말 멋져요!');
-if(v==='good')P.push('목소리가 크고 자신감 있었어요!');else if(v==='mid')P.push('목소리가 잘 들렸어요.');
-if(v==='low')F.push('목소리가 조금 작아요. 배에 힘을 주고, 맨 뒤 관객에게 들려준다고 생각하며 더 크게!');else if(v==='mid')F.push('한 단계만 더 크게 말해 볼까요?');
-if(res.hasSR&&!res.tx)F.push('소리가 잘 인식되지 않았어요. 마이크 가까이에서 또박또박 다시 해 봐요.');
+if(!res.hasMic)F.push('숨을 한 번 쉬고, 편안한 속도로 또박또박 말해 봐요.');
+P.push(sc===null?'끝까지 용기 있게 말해 줬어요!':sc>=.9?'대사를 거의 다 기억하고 있어요!':sc>=.7?'대본을 잘 기억하고 있어요!':'용기 내서 끝까지 말한 게 정말 멋져요!');
+if(v==='good')P.push('목소리가 잘 들려서 듣기 좋았어요!');else if(v==='mid')P.push('목소리가 잘 들렸어요.');
+if(v==='low')F.push('목소리가 살짝 작게 들렸어요. 괜찮아요! 숨을 한 번 쉬고 조금만 또렷하게 해 볼까요?');else if(v==='mid')F.push('조금만 더 또렷하게 말하면 더 좋아요.');
+if(res.hasSR&&!res.tx)F.push('앱이 소리를 잘 못 들었어요. 네 잘못이 아니에요! 마이크 가까이에서 한 번만 더 해 볼까요?');
 else if(sc!==null&&sc<.7&&!miss.length)F.push('대본을 한 번 더 보고 천천히 말해 봐요.');
 const spoken=F.slice();
-if(miss.length)F.push('빠지거나 다르게 들린 단어: '+miss.join(', '));
+if(miss.length)F.push('다시 연습하면 좋은 단어: '+miss.join(', '));
 const tips=miss.map(w=>TIPS[w]).filter(Boolean).slice(0,2);
-if(!F.length)F.push('이제 표정과 억양만 더 살리면 완벽해요!'),spoken.push(F[0]);
-parts.push({t:P.join(' '),l:'ko'});spoken.forEach(t=>parts.push({t,l:'ko'}));
+if(!F.length)F.push('정말 잘했어요! 다음 대사도 편하게 이어서 해 봐요.'),spoken.push(F[0]);
+parts.push({t:P.join(' '),l:'ko'});spoken.slice(0,1).forEach(t=>parts.push({t,l:'ko'}));
 if(miss.length){parts.push({t:'이 단어들을 다시 한번 들어 봐요.',l:'ko'});miss.forEach(w=>parts.push({t:w,k:'mc1'}));tips.forEach(t=>parts.push({t,l:'ko'}))}
 parts.push({t:CLOSE(),l:'ko'});
-return{P,F,tips,sc,parts,pass:sc!==null&&sc>=.7&&v!=='low'}}
+return{P,F,tips,sc,parts,pass:sc!==null&&sc>=.7}}
 function fbQ(res){const P=[],F=[],v=vol(res),n=norm(res.tx||'').length;
 P.push(res.tx?(n>=6?'완전한 문장으로 대답했어요! 아주 좋아요.':'대답해 줘서 고마워요!'):'끝까지 대답해 줘서 멋져요!');
-if(v==='good')P.push('목소리도 크고 자신감 있었어요!');else if(v==='mid')P.push('목소리가 잘 들렸어요.');
-if(res.tx&&n<6)F.push('한 문장 이상으로 길게! because를 넣어서 이유까지 말해 봐요.');
-if(v==='low')F.push('목소리가 조금 작아요. 맨 뒤 관객에게 들려준다고 생각하며 더 크게!');else if(v==='mid')F.push('한 단계만 더 크게 말해 볼까요?');
-if(res.hasSR&&!res.tx)F.push('소리가 잘 인식되지 않았어요. 마이크 가까이에서 다시 해 봐요.');
+if(v==='good')P.push('목소리가 또렷해서 듣기 좋았어요!');else if(v==='mid')P.push('목소리가 잘 들렸어요.');
+if(res.tx&&n<6)F.push('다음엔 because를 넣어서 이유를 한마디 덧붙여 보면 더 좋아요.');
+if(v==='low')F.push('목소리가 살짝 작게 들렸어요. 괜찮아요! 숨을 한 번 쉬고 조금만 또렷하게 해 볼까요?');else if(v==='mid')F.push('조금만 더 또렷하게 말하면 더 좋아요.');
+if(res.hasSR&&!res.tx)F.push('앱이 소리를 잘 못 들었어요. 네 잘못이 아니에요! 마이크 가까이에서 한 번만 더 해 볼까요?');
 if(!F.length)F.push('좋아요! 대답 앞에 "Good question!"을 붙이면 더 여유 있어 보여요.');
 return{P,F,tips:[],sc:null,parts:[{t:P.join(' '),l:'ko'},...F.map(t=>({t:t.replace(/"Good question!"/,'굿 퀘스천'),l:'ko'})),{t:CLOSE(),l:'ko'}],pass:false}}
 function show(f){$('#res').innerHTML=`<div class="fb ok">✅ ${f.P.join(' ')}${f.sc!==null?` <b>(대본 일치 ${Math.round(f.sc*100)}%)</b>`:''}</div><div class="fb fix">🛠 ${f.F.join('<br>')}${f.tips.length?'<br>💡 '+f.tips.join('<br>💡 '):''}</div>`}
@@ -189,11 +198,13 @@ $('#bNext').onclick=()=>{if(S.m==='r')return S.i>=L.length?mode('q'):go(S.i+1);S
 $('#bStart').onclick=()=>S.m==='r'?startR():startQ();
 async function ask(){stopAll();render();setB();$('#bRec').textContent='🎙 말하기';status('👥 관객 질문을 들어요…');if(await sp([{t:S.q[S.qi].q,k:'aud'}]))ready()}
 async function startQ(){stopAll();S.m='q';S.q=[...QA].sort(()=>Math.random()-.5);S.qi=0;render();setB();
-if(await sp([{t:'자, 이제 관객 질문 시간이에요! 질문을 잘 듣고 자신 있게 대답해 봐요. 정답은 없고, 내 경험을 말하면 돼요.',l:'ko'}]))ask()}
+if(await sp([{t:'자, 이제 관객 질문 시간이에요! 질문을 잘 듣고 편하게 대답해 봐요. 정답은 없고, 못 알아들었으면 다시 들어도 괜찮아요.',l:'ko'}]))ask()}
 function mode(m){stopAll();S.m=m;S.busy=false;S.i=-1;S.q=[];S.qi=0;$('#t1').className=m==='r'?'on':'';$('#t2').className=m==='q'?'on':'';
 render();setB('bStart');$('#bStart').textContent=m==='r'?'▶ 연습 시작':'▶ 관객 질문 시작';$('#bRec').textContent='🎙 말하기';status('')}
 $('#t1').onclick=()=>mode('r');$('#t2').onclick=()=>mode('q');
 if(!('speechSynthesis' in window))status('⚠️ 이 브라우저는 음성 읽기를 지원하지 않아요. Chrome이나 Safari를 써 주세요.');
 if(/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1))$('#mt').value='0';
+['vE','vE2'].forEach(id=>$('#'+id).onchange=()=>{stopAll();say('Good evening! This year was amazing!','en',id==='vE'?'mc2':'mc1')});
+$('#vK').onchange=()=>{stopAll();say('안녕하세요, 천천히 같이 연습해 봐요.','ko')};
 mode('r');
 </script></body></html>
